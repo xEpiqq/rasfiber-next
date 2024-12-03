@@ -20,6 +20,7 @@ import {
   TableRow,
 } from '@/components/table';
 import { Input } from '@/components/input';
+import { v4 as uuidv4 } from 'uuid'; // Import UUID generator
 
 const PayrollApp = () => {
   // State Management
@@ -28,6 +29,7 @@ const PayrollApp = () => {
   const [managerPayscales, setManagerPayscales] = useState([]);
   const [users, setUsers] = useState([]);
   const [managers, setManagers] = useState([]);
+
   const [plansLoading, setPlansLoading] = useState(true);
   const [personalPayscalesLoading, setPersonalPayscalesLoading] = useState(true);
   const [managerPayscalesLoading, setManagerPayscalesLoading] = useState(true);
@@ -62,61 +64,114 @@ const PayrollApp = () => {
 
   // Fetch Data on Component Mount
   useEffect(() => {
-    fetchPlans();
-    fetchPersonalPayscales();
-    fetchManagerPayscales();
-    fetchUsers();
-    fetchManagers();
+    fetchAllData();
   }, []);
+
+  // Function to fetch all data in parallel
+  const fetchAllData = async () => {
+    await Promise.all([
+      fetchPlans(),
+      fetchPersonalPayscales(),
+      fetchManagerPayscales(),
+      fetchUsers(),
+      fetchManagers(),
+    ]);
+  };
 
   // Fetch Functions
   const fetchPlans = async () => {
     setPlansLoading(true);
     const { data, error } = await supabase.from('plans').select('*');
-    if (error) console.error('Error fetching plans:', error);
-    else setPlans(data);
+    if (error) {
+      console.error('Error fetching plans:', error);
+    } else {
+      setPlans(data);
+    }
     setPlansLoading(false);
   };
 
   const fetchPersonalPayscales = async () => {
     setPersonalPayscalesLoading(true);
-    const { data, error } = await supabase
+    const { data: payscales, error: payscalesError } = await supabase
       .from('personal_payscales')
-      .select(`
-        *,
-        personal_payscale_plan_commissions (
-          plan_id,
-          rep_commission_value,
-          plans (name)
-        )
-      `);
-    if (error) console.error('Error fetching personal payscales:', error);
-    else setPersonalPayscales(data);
+      .select('*');
+
+    if (payscalesError) {
+      console.error('Error fetching personal payscales:', payscalesError);
+      setPersonalPayscalesLoading(false);
+      return;
+    }
+
+    const { data: commissions, error: commissionsError } = await supabase
+      .from('personal_payscale_plan_commissions')
+      .select('*');
+
+    if (commissionsError) {
+      console.error('Error fetching personal payscale commissions:', commissionsError);
+      setPersonalPayscalesLoading(false);
+      return;
+    }
+
+    // Combine payscales with their commissions
+    const combinedData = payscales.map((payscale) => ({
+      ...payscale,
+      personal_payscale_plan_commissions: commissions
+        .filter((c) => c.personal_payscale_id === payscale.id)
+        .map((c) => ({
+          ...c,
+          plan_name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown',
+        })),
+    }));
+
+    setPersonalPayscales(combinedData);
     setPersonalPayscalesLoading(false);
   };
 
   const fetchManagerPayscales = async () => {
     setManagerPayscalesLoading(true);
-    const { data, error } = await supabase
+    const { data: payscales, error: payscalesError } = await supabase
       .from('manager_payscales')
-      .select(`
-        *,
-        manager_payscale_plan_commissions (
-          plan_id,
-          manager_commission_value,
-          plans (name)
-        )
-      `);
-    if (error) console.error('Error fetching manager payscales:', error);
-    else setManagerPayscales(data);
+      .select('*');
+
+    if (payscalesError) {
+      console.error('Error fetching manager payscales:', payscalesError);
+      setManagerPayscalesLoading(false);
+      return;
+    }
+
+    const { data: commissions, error: commissionsError } = await supabase
+      .from('manager_payscale_plan_commissions')
+      .select('*');
+
+    if (commissionsError) {
+      console.error('Error fetching manager payscale commissions:', commissionsError);
+      setManagerPayscalesLoading(false);
+      return;
+    }
+
+    // Combine manager payscales with their commissions
+    const combinedData = payscales.map((payscale) => ({
+      ...payscale,
+      manager_payscale_plan_commissions: commissions
+        .filter((c) => c.manager_payscale_id === payscale.id)
+        .map((c) => ({
+          ...c,
+          plan_name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown',
+        })),
+    }));
+
+    setManagerPayscales(combinedData);
     setManagerPayscalesLoading(false);
   };
 
   const fetchUsers = async () => {
     setUsersLoading(true);
     const { data, error } = await supabase.from('profiles').select('*');
-    if (error) console.error('Error fetching users:', error);
-    else setUsers(data);
+    if (error) {
+      console.error('Error fetching users:', error);
+    } else {
+      setUsers(data);
+    }
     setUsersLoading(false);
   };
 
@@ -125,9 +180,21 @@ const PayrollApp = () => {
       .from('profiles')
       .select('*')
       .eq('is_manager', true);
-    if (error) console.error('Error fetching managers:', error);
-    else setManagers(data);
+    if (error) {
+      console.error('Error fetching managers:', error);
+    } else {
+      setManagers(data);
+    }
   };
+
+  // Create a memoized map for manager IDs to names for efficient lookup
+  const managerMap = useMemo(() => {
+    const map = {};
+    managers.forEach((manager) => {
+      map[manager.id] = manager.name;
+    });
+    return map;
+  }, [managers]);
 
   // Add Plan Function with Optimistic Update
   const addPlan = async () => {
@@ -141,9 +208,12 @@ const PayrollApp = () => {
       return;
     }
 
+    // Generate a valid UUID for temporary ID
+    const tempId = uuidv4();
+
     // Create a temporary plan for optimistic UI update
     const tempPlan = {
-      id: Date.now(),
+      id: tempId, // Temporary valid UUID
       name: newPlan.name,
       commission_amount: commissionAmount,
     };
@@ -151,10 +221,10 @@ const PayrollApp = () => {
     setIsPlanModalOpen(false);
     setNewPlan({ name: '', commission_amount: '' });
 
-    // Insert into the database
+    // Insert into the database with the temporary ID
     const { data, error } = await supabase
       .from('plans')
-      .insert([{ name: newPlan.name, commission_amount: commissionAmount }])
+      .insert([{ id: tempId, name: newPlan.name, commission_amount: commissionAmount }])
       .select('*');
 
     if (error) {
@@ -166,7 +236,7 @@ const PayrollApp = () => {
     }
 
     if (data && data.length > 0) {
-      // Replace the temporary plan with the actual data from DB
+      // Optionally, update the plan with any additional data from the DB
       setPlans((prevPlans) =>
         prevPlans.map((plan) => (plan.id === tempPlan.id ? data[0] : plan))
       );
@@ -197,8 +267,8 @@ const PayrollApp = () => {
     // Validate commissions
     const commissionsArray = [];
     let allFieldsFilled = true;
-    for (const planId of plans.map((plan) => plan.id)) {
-      const value = newPersonalPayscale.commissions[planId];
+    for (const plan of plans) {
+      const value = newPersonalPayscale.commissions[plan.id];
       if (value === undefined || value === '') {
         allFieldsFilled = false;
         break;
@@ -208,7 +278,7 @@ const PayrollApp = () => {
         return;
       }
       commissionsArray.push({
-        plan_id: parseInt(planId),
+        plan_id: plan.id,
         rep_commission_value: parseFloat(value),
         rep_commission_type: 'fixed_amount',
       });
@@ -219,27 +289,31 @@ const PayrollApp = () => {
       return;
     }
 
+    // Generate a valid UUID for temporary ID
+    const tempId = uuidv4();
+
     // Create a temporary payscale for optimistic UI update
     const tempPayscale = {
-      id: Date.now(),
+      id: tempId, // Temporary valid UUID
       name: newPersonalPayscale.name,
       upfront_percentage: upfront,
       backend_percentage: backend,
       personal_payscale_plan_commissions: commissionsArray.map((c) => ({
         plan_id: c.plan_id,
         rep_commission_value: c.rep_commission_value,
-        plans: { name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown' },
+        plan_name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown',
       })),
     };
     setPersonalPayscales([...personalPayscales, tempPayscale]);
     setIsPersonalPayscaleModalOpen(false);
     setNewPersonalPayscale({ name: '', commissions: {}, upfront_percentage: '', backend_percentage: '' });
 
-    // Insert payscale into the database
+    // Insert payscale into the database with the temporary ID
     const { data: payscaleData, error: payscaleError } = await supabase
       .from('personal_payscales')
       .insert([
         { 
+          id: tempId, // Use temporary valid UUID
           name: newPersonalPayscale.name, 
           upfront_percentage: upfront, 
           backend_percentage: backend 
@@ -255,38 +329,28 @@ const PayrollApp = () => {
       return;
     }
 
-    if (!payscaleData || payscaleData.length === 0) {
-      alert('Failed to add personal payscale.');
-      // Revert the optimistic update
-      setPersonalPayscales(personalPayscales.filter((p) => p.id !== tempPayscale.id));
-      return;
-    }
-
-    const payscaleId = payscaleData[0].id;
-
-    // Prepare commissions for insertion
-    const commissions = commissionsArray.map((commission) => ({
-      personal_payscale_id: payscaleId,
+    // Insert commissions into the database
+    const commissionsToInsert = commissionsArray.map((commission) => ({
+      personal_payscale_id: payscaleData[0].id,
       plan_id: commission.plan_id,
-      rep_commission_type: 'fixed_amount',
+      rep_commission_type: commission.rep_commission_type,
       rep_commission_value: commission.rep_commission_value,
     }));
 
-    // Insert commissions into the database
     const { error: commissionError } = await supabase
       .from('personal_payscale_plan_commissions')
-      .insert(commissions);
+      .insert(commissionsToInsert);
 
     if (commissionError) {
       console.error('Error adding commissions:', commissionError);
       alert('Error adding commissions: ' + commissionError.message);
       // Optionally, delete the previously added payscale to maintain data integrity
-      await supabase.from('personal_payscales').delete().eq('id', payscaleId);
+      await supabase.from('personal_payscales').delete().eq('id', payscaleData[0].id);
       setPersonalPayscales(personalPayscales.filter((p) => p.id !== tempPayscale.id));
       return;
     }
 
-    // Fetch the updated payscales with commissions to ensure data consistency
+    // Refresh personal payscales to get accurate data
     fetchPersonalPayscales();
   };
 
@@ -300,8 +364,8 @@ const PayrollApp = () => {
     // Validate commissions
     const commissionsArray = [];
     let allFieldsFilled = true;
-    for (const planId of plans.map((plan) => plan.id)) {
-      const value = newManagerPayscale.commissions[planId];
+    for (const plan of plans) {
+      const value = newManagerPayscale.commissions[plan.id];
       if (value === undefined || value === '') {
         allFieldsFilled = false;
         break;
@@ -311,7 +375,7 @@ const PayrollApp = () => {
         return;
       }
       commissionsArray.push({
-        plan_id: parseInt(planId),
+        plan_id: plan.id,
         manager_commission_value: parseFloat(value),
         manager_commission_type: 'fixed_amount',
       });
@@ -322,24 +386,32 @@ const PayrollApp = () => {
       return;
     }
 
+    // Generate a valid UUID for temporary ID
+    const tempId = uuidv4();
+
     // Create a temporary payscale for optimistic UI update
     const tempPayscale = {
-      id: Date.now(),
+      id: tempId, // Temporary valid UUID
       name: newManagerPayscale.name,
       manager_payscale_plan_commissions: commissionsArray.map((c) => ({
         plan_id: c.plan_id,
         manager_commission_value: c.manager_commission_value,
-        plans: { name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown' },
+        plan_name: plans.find((p) => p.id === c.plan_id)?.name || 'Unknown',
       })),
     };
     setManagerPayscales([...managerPayscales, tempPayscale]);
     setIsManagerPayscaleModalOpen(false);
     setNewManagerPayscale({ name: '', commissions: {} });
 
-    // Insert payscale into the database
+    // Insert payscale into the database with the temporary ID
     const { data: payscaleData, error: payscaleError } = await supabase
       .from('manager_payscales')
-      .insert([{ name: newManagerPayscale.name }])
+      .insert([
+        { 
+          id: tempId, // Use temporary valid UUID
+          name: newManagerPayscale.name 
+        }
+      ])
       .select('*');
 
     if (payscaleError) {
@@ -350,38 +422,28 @@ const PayrollApp = () => {
       return;
     }
 
-    if (!payscaleData || payscaleData.length === 0) {
-      alert('Failed to add manager payscale.');
-      // Revert the optimistic update
-      setManagerPayscales(managerPayscales.filter((p) => p.id !== tempPayscale.id));
-      return;
-    }
-
-    const payscaleId = payscaleData[0].id;
-
-    // Prepare commissions for insertion
-    const commissions = commissionsArray.map((commission) => ({
-      manager_payscale_id: payscaleId,
+    // Insert commissions into the database
+    const commissionsToInsert = commissionsArray.map((commission) => ({
+      manager_payscale_id: payscaleData[0].id,
       plan_id: commission.plan_id,
-      manager_commission_type: 'fixed_amount',
+      manager_commission_type: commission.manager_commission_type,
       manager_commission_value: commission.manager_commission_value,
     }));
 
-    // Insert commissions into the database
     const { error: commissionError } = await supabase
       .from('manager_payscale_plan_commissions')
-      .insert(commissions);
+      .insert(commissionsToInsert);
 
     if (commissionError) {
-      console.error('Error adding commissions:', commissionError);
-      alert('Error adding commissions: ' + commissionError.message);
+      console.error('Error adding manager commissions:', commissionError);
+      alert('Error adding manager commissions: ' + commissionError.message);
       // Optionally, delete the previously added payscale to maintain data integrity
-      await supabase.from('manager_payscales').delete().eq('id', payscaleId);
+      await supabase.from('manager_payscales').delete().eq('id', payscaleData[0].id);
       setManagerPayscales(managerPayscales.filter((p) => p.id !== tempPayscale.id));
       return;
     }
 
-    // Fetch the updated payscales with commissions to ensure data consistency
+    // Refresh manager payscales to get accurate data
     fetchManagerPayscales();
   };
 
@@ -429,7 +491,6 @@ const PayrollApp = () => {
     // Prepare payload
     const payload = {
       newUser,
-      customCommissions: [],
     };
 
     try {
@@ -448,9 +509,8 @@ const PayrollApp = () => {
       }
 
       alert('User created successfully.');
-      // Refresh users list
-      fetchUsers();
-      fetchManagers();
+      // Refresh users and managers list
+      await Promise.all([fetchUsers(), fetchManagers()]);
       setIsUserModalOpen(false);
       setNewUser({
         email: '',
@@ -537,9 +597,11 @@ const PayrollApp = () => {
                         <TableCell>{userItem.email}</TableCell>
                         <TableCell>{userItem.is_manager ? 'Yes' : 'No'}</TableCell>
                         <TableCell>
-                          {userItem.manager_id
-                            ? users.find((u) => u.id === userItem.manager_id)?.name || 'N/A'
-                            : 'N/A'}
+                          {userItem.manager_id ? (
+                            managerMap[userItem.manager_id] || 'N/A'
+                          ) : (
+                            'N/A'
+                          )}
                         </TableCell>
                         <TableCell>
                           {userItem.personal_payscale_id
@@ -551,7 +613,9 @@ const PayrollApp = () => {
                           {userItem.manager_payscale_id
                             ? managerPayscales.find((p) => p.id === userItem.manager_payscale_id)?.name ||
                               'N/A'
-                            : userItem.is_manager ? 'N/A' : 'N/A'}
+                            : userItem.is_manager
+                            ? 'N/A'
+                            : 'N/A'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -624,7 +688,7 @@ const PayrollApp = () => {
                             ? payscale.personal_payscale_plan_commissions.map(
                                 (commission, idx) => (
                                   <div key={idx}>
-                                    {commission.plans.name}: $
+                                    {commission.plan_name}: $
                                     {parseFloat(
                                       commission.rep_commission_value
                                     ).toFixed(2)}
@@ -670,7 +734,7 @@ const PayrollApp = () => {
                             ? payscale.manager_payscale_plan_commissions.map(
                                 (commission, idx) => (
                                   <div key={idx}>
-                                    {commission.plans.name}: $
+                                    {commission.plan_name}: $
                                     {parseFloat(
                                       commission.manager_commission_value
                                     ).toFixed(2)}
