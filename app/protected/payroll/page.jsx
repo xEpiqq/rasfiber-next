@@ -235,7 +235,7 @@ export default function PayrollTab() {
       .map(([agentId, data]) => {
         const personalTotal = data.personalTotal || 0;
         const managerTotal = data.managerTotal || 0;
-        const grandTotal = personalTotal + managerTotal;
+        const grandTotal = personalTotal + managerTotal; // still computed but not displayed
         let upfrontValue = null;
         if (data.upfront_percentage !== null && !isNaN(data.upfront_percentage)) {
           upfrontValue = personalTotal * (data.upfront_percentage / 100);
@@ -402,7 +402,7 @@ export default function PayrollTab() {
                 <TableHeader># Accounts</TableHeader>
                 <TableHeader>Personal Total</TableHeader>
                 <TableHeader>Manager Total</TableHeader>
-                <TableHeader>Grand Total</TableHeader>
+                {/* Removed Grand Total column */}
                 <TableHeader>Upfront</TableHeader>
               </TableRow>
             </TableHead>
@@ -412,8 +412,7 @@ export default function PayrollTab() {
                   ? `$${r.personalTotal.toFixed(2)}` : 'N/A';
                 const managerTotalDisplay = (typeof r.managerTotal === 'number' && r.managerTotal > 0)
                   ? `$${r.managerTotal.toFixed(2)}` : 'N/A';
-                const grandTotalDisplay = typeof r.grandTotal === 'number'
-                  ? `$${r.grandTotal.toFixed(2)}` : 'N/A';
+                // Grand total not displayed
                 const upfrontDisplay = (r.upfrontValue !== null && !isNaN(r.upfrontValue))
                   ? `$${r.upfrontValue.toFixed(2)} (${r.upfront_percentage}%)` : 'N/A';
                 const isExpanded = expandedAgents.has(r.agentId);
@@ -430,12 +429,11 @@ export default function PayrollTab() {
                       <TableCell>{r.accounts}</TableCell>
                       <TableCell>{personalTotalDisplay}</TableCell>
                       <TableCell>{managerTotalDisplay}</TableCell>
-                      <TableCell>{grandTotalDisplay}</TableCell>
                       <TableCell>{upfrontDisplay}</TableCell>
                     </TableRow>
                     {isExpanded && (
                       <TableRow>
-                        <TableCell colSpan={7} className="bg-gray-50">
+                        <TableCell colSpan={6} className="bg-gray-50">
                           <div className="p-4">
                             <h4 className="font-bold mb-2">Sales Details</h4>
                             <Table striped>

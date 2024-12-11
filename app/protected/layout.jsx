@@ -12,7 +12,12 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '@/components/dropdown';
-import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from '@/components/navbar';
+import {
+  Navbar,
+  NavbarItem,
+  NavbarSection,
+  NavbarSpacer,
+} from '@/components/navbar';
 import {
   Sidebar,
   SidebarBody,
@@ -45,7 +50,7 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/20/solid';
 import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 function isOverdue(install_date) {
   if (!install_date) return false;
@@ -57,67 +62,49 @@ function isOverdue(install_date) {
 const Example = ({ children }) => {
   const [user, setUser] = useState(null);
   const router = useRouter();
+  const pathname = usePathname();
   const [backendOverdueCount, setBackendOverdueCount] = useState(0);
-
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('Error fetching user:', error);
-      } else {
-        setUser(data.user);
-      }
+      if (error) console.error('Error fetching user:', error);
+      else setUser(data.user);
     };
-
     fetchUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => setUser(session?.user ?? null)
+    );
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
 
   useEffect(() => {
-    // Fetch all overdue backend accounts globally
-    // Overdue: white_glove_entries not backend_paid and older than 90 days
     const fetchOverdueCount = async () => {
       const { data: wgeData, error } = await supabase
         .from('white_glove_entries')
         .select('install_date, backend_paid');
-
-      if (error) {
-        console.error('Error fetching white_glove_entries:', error);
-        return;
-      }
-
+      if (error) return console.error(error);
       let count = 0;
       for (const w of wgeData) {
-        if (!w.backend_paid && isOverdue(w.install_date)) {
-          count++;
-        }
+        if (!w.backend_paid && isOverdue(w.install_date)) count++;
       }
-
       setBackendOverdueCount(count);
     };
-
     fetchOverdueCount();
   }, [supabase]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error signing out:', error);
-    } else {
-      router.push('/sign-in');
-    }
+    if (error) console.error('Error signing out:', error);
+    else router.push('/sign-in');
   };
 
   const nonClickableClass = 'text-gray-600 dark:text-gray-400 cursor-default rounded-md';
+  const linkClass = 'flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md';
+  const isActive = (url) => (pathname === url ? 'bg-gray-200 dark:bg-gray-800' : '');
 
   return (
     <SidebarLayout
@@ -125,16 +112,10 @@ const Example = ({ children }) => {
         <Navbar>
           <NavbarSpacer />
           <NavbarSection>
-            <NavbarItem
-              aria-label="Search"
-              className={`${nonClickableClass} flex items-center`}
-            >
+            <NavbarItem className={`${nonClickableClass} flex items-center`}>
               <MagnifyingGlassIcon className="h-5 w-5" />
             </NavbarItem>
-            <NavbarItem
-              aria-label="Home"
-              className={`${nonClickableClass} flex items-center`}
-            >
+            <NavbarItem className={`${nonClickableClass} flex items-center`}>
               <HomeIcon className="h-5 w-5" />
             </NavbarItem>
             <Dropdown>
@@ -142,32 +123,20 @@ const Example = ({ children }) => {
                 <Avatar src={user?.user_metadata?.avatar_url || '/snowma.jpeg'} square />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="bottom end">
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <UserIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>My profile</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <Cog8ToothIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Settings</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <ShieldCheckIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Privacy policy</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <LightBulbIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Share feedback</DropdownLabel>
                 </DropdownItem>
@@ -221,34 +190,34 @@ const Example = ({ children }) => {
           <SidebarBody>
             <SidebarSection>
               <SidebarItem
-                className="flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md"
+                className={`${linkClass} ${isActive('/protected/payroll')}`}
                 onClick={() => router.push('/protected/payroll')}
               >
                 <CurrencyDollarIcon className="h-5 w-5 mr-2" />
                 <SidebarLabel>Calculate</SidebarLabel>
               </SidebarItem>
               <SidebarItem
-                className="flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md"
+                className={`${linkClass} ${isActive('/protected/payscales')}`}
                 onClick={() => router.push('/protected/payscales')}
               >
                 <ChartBarIcon className="h-5 w-5 mr-2" />
                 <SidebarLabel>Payscales</SidebarLabel>
               </SidebarItem>
               <SidebarItem
-                className="flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md"
+                className={`${linkClass} ${isActive('/protected/frontend')}`}
                 onClick={() => router.push('/protected/frontend')}
               >
                 <BanknotesIcon className="h-5 w-5 mr-2" />
                 <SidebarLabel>Frontend</SidebarLabel>
               </SidebarItem>
               <SidebarItem
-                className="flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md relative"
+                className={`${linkClass} ${isActive('/protected/backend')} relative`}
                 onClick={() => router.push('/protected/backend')}
               >
                 <BanknotesIcon className="h-5 w-5 mr-2" />
                 <SidebarLabel>Backend</SidebarLabel>
                 {backendOverdueCount > 0 && (
-                  <span className="absolute right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                  <span className="absolute right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white bg-red-600 rounded-full">
                     {backendOverdueCount}
                   </span>
                 )}
@@ -288,32 +257,20 @@ const Example = ({ children }) => {
                 <ChevronUpIcon className="h-4 w-4 ml-auto" />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <UserIcon20 className="h-5 w-5 mr-2" />
                   <DropdownLabel>My profile</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <Cog8ToothIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Settings</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <ShieldCheckIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Privacy policy</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem
-                  onClick={(e) => e.preventDefault()}
-                  className="flex items-center cursor-default"
-                >
+                <DropdownItem className="flex items-center cursor-default">
                   <LightBulbIcon className="h-5 w-5 mr-2" />
                   <DropdownLabel>Share feedback</DropdownLabel>
                 </DropdownItem>
