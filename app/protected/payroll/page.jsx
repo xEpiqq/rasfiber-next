@@ -453,7 +453,7 @@ export default function PayrollTab() {
 
   return (
     <div className="p-6 space-y-6 font-sans text-gray-900">
-      <h2 className="text-2xl font-bold">Payroll Report Generator</h2>
+      <h2 className="text-2xl font-bold">Payroll Report Generator (Upload as CSV files)</h2>
       <input
         type="file"
         ref={file1Ref}
