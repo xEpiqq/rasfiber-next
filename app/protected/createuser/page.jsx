@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
-import { CheckboxField, Checkbox } from '@/components/checkbox'; // Removed Label from here
-import { Label } from '@/components/fieldset'; // Import Label from fieldset
+import { CheckboxField, Checkbox } from '@/components/checkbox';
+import { Label } from '@/components/fieldset';
 import { Select } from '@/components/select';
 import { createClient } from '@/utils/supabase/client';
 
@@ -38,13 +38,13 @@ export default function CreateUserPage() {
       is_manager: isManager,
       personal_payscale_id: personalPayscaleId || null,
       manager_payscale_id: isManager ? (managerPayscaleId || null) : null,
-      assignedUsers: []
+      assignedUsers: [],
     };
 
     const res = await fetch('/api/createUser', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newUser })
+      body: JSON.stringify({ newUser }),
     });
     const json = await res.json();
 
@@ -66,11 +66,20 @@ export default function CreateUserPage() {
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
         <div>
           <Label>Email</Label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
         <div>
           <Label>Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} required />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         </div>
         <CheckboxField>
           <Checkbox checked={isManager} onChange={setIsManager} />
@@ -78,17 +87,31 @@ export default function CreateUserPage() {
         </CheckboxField>
         <div>
           <Label>Personal Payscale</Label>
-          <Select value={personalPayscaleId} onChange={(e) => setPersonalPayscaleId(e.target.value)}>
+          <Select
+            value={personalPayscaleId}
+            onChange={(e) => setPersonalPayscaleId(e.target.value)}
+          >
             <option value="">Select Personal Payscale</option>
-            {personalPayscaleOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {personalPayscaleOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </Select>
         </div>
         {isManager && (
           <div>
             <Label>Manager Payscale</Label>
-            <Select value={managerPayscaleId} onChange={(e) => setManagerPayscaleId(e.target.value)}>
+            <Select
+              value={managerPayscaleId}
+              onChange={(e) => setManagerPayscaleId(e.target.value)}
+            >
               <option value="">Select Manager Payscale</option>
-              {managerPayscaleOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {managerPayscaleOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </Select>
           </div>
         )}

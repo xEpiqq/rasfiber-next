@@ -31,7 +31,9 @@ export default function ReportsPage() {
   const [wgeMap, setWgeMap] = useState({});
   const [batchPaidMap, setBatchPaidMap] = useState({});
 
-  useEffect(() => { fetchBatches(); }, []);
+  useEffect(() => {
+    fetchBatches();
+  }, []);
 
   async function fetchBatches() {
     setLoading(true);
@@ -40,7 +42,11 @@ export default function ReportsPage() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (batchError) { console.error('Error fetching batches:', batchError); setLoading(false); return; }
+    if (batchError) {
+      console.error('Error fetching batches:', batchError);
+      setLoading(false);
+      return;
+    }
 
     if (batchData && batchData.length > 0) {
       const newBatchPaidMap = {};
@@ -60,7 +66,9 @@ export default function ReportsPage() {
       }
       setBatches(batchData);
       setBatchPaidMap(newBatchPaidMap);
-    } else { setBatches([]); }
+    } else {
+      setBatches([]);
+    }
     setLoading(false);
   }
 
@@ -72,20 +80,26 @@ export default function ReportsPage() {
       const allIds = [];
       for (const line of data) {
         if (Array.isArray(line.details)) {
-          for (const d of line.details) { if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id); }
+          for (const d of line.details) {
+            if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id);
+          }
         }
       }
       let wgeById = {};
       if (allIds.length > 0) {
         const { data: wgeData } = await supabase.from('white_glove_entries').select('*').in('id', allIds);
-        (wgeData || []).forEach(w => { wgeById[w.id] = w; });
+        (wgeData || []).forEach(w => {
+          wgeById[w.id] = w;
+        });
       }
 
+      // Auto-check if all accounts are paid => then mark the line as paid
       for (let i = 0; i < data.length; i++) {
         const line = data[i];
         const lineAccs = Array.isArray(line.details) ? line.details : [];
         const allPaid = lineAccs.length > 0 && lineAccs.every(d => {
-          const w = wgeById[d.white_glove_entry_id]; return w && w.frontend_paid;
+          const w = wgeById[d.white_glove_entry_id];
+          return w && w.frontend_paid;
         });
         if (allPaid && !line.frontend_is_paid) {
           line.frontend_is_paid = true;
@@ -135,16 +149,19 @@ export default function ReportsPage() {
     if (wgeIds.length > 0) {
       await supabase.from('white_glove_entries').update({ frontend_paid: newPaidValue }).in('id', wgeIds);
       const newWgeMap = { ...wgeMap };
-      wgeIds.forEach(id => { if (newWgeMap[id]) newWgeMap[id].frontend_paid = newPaidValue; });
+      wgeIds.forEach(id => {
+        if (newWgeMap[id]) newWgeMap[id].frontend_paid = newPaidValue;
+      });
       setWgeMap(newWgeMap);
     }
 
-    setReportLines(prev => prev.map(r => r.id === line.id ? updatedLine : r));
+    setReportLines(prev => prev.map(r => (r.id === line.id ? updatedLine : r)));
     if (newPaidValue) setExpandedAgents(prev => new Set([...prev, updatedLine.id]));
   }
 
   async function toggleAccountPaid(line, wgeId) {
-    const w = wgeMap[wgeId]; if (!w) return;
+    const w = wgeMap[wgeId];
+    if (!w) return;
     const newPaidValue = !w.frontend_paid;
 
     await supabase.from('white_glove_entries').update({ frontend_paid: newPaidValue }).eq('id', wgeId);
@@ -156,10 +173,10 @@ export default function ReportsPage() {
     const allPaid = lineAccs.every(d => newWgeMap[d.white_glove_entry_id]?.frontend_paid);
     if (allPaid && !line.frontend_is_paid) {
       await supabase.from('payroll_reports').update({ frontend_is_paid: true }).eq('id', line.id);
-      setReportLines(prev => prev.map(r => r.id === line.id ? { ...r, frontend_is_paid: true } : r));
+      setReportLines(prev => prev.map(r => (r.id === line.id ? { ...r, frontend_is_paid: true } : r)));
     } else if (!allPaid && line.frontend_is_paid) {
       await supabase.from('payroll_reports').update({ frontend_is_paid: false }).eq('id', line.id);
-      setReportLines(prev => prev.map(r => r.id === line.id ? { ...r, frontend_is_paid: false } : r));
+      setReportLines(prev => prev.map(r => (r.id === line.id ? { ...r, frontend_is_paid: false } : r)));
     }
   }
 
@@ -204,7 +221,10 @@ export default function ReportsPage() {
                 <div className="absolute top-2 left-2 bg-white bg-opacity-90 text-gray-800 text-sm font-bold px-2 py-1 rounded">
                   {pct}% Paid Out
                 </div>
-                <div className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Dropdown>
                     <DropdownButton as="div" className="cursor-pointer flex justify-center items-center">
                       <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
@@ -217,7 +237,9 @@ export default function ReportsPage() {
                   </Dropdown>
                 </div>
                 <div className="w-full py-6 flex flex-col items-center" style={{ pointerEvents: 'none' }}>
-                  <span className="text-lg font-semibold text-gray-900 text-center">{batch.batch_name}</span>
+                  <span className="text-lg font-semibold text-gray-900 text-center">
+                    {batch.batch_name}
+                  </span>
                   <div className="text-sm text-gray-700 text-center">
                     Created at: {new Date(batch.created_at).toLocaleString()}
                   </div>
@@ -242,7 +264,10 @@ export default function ReportsPage() {
         <div>{paidPercentage}% paid out</div>
       </div>
       <div className="w-full bg-gray-200 h-2 rounded">
-        <div className="bg-green-500 h-2 rounded" style={{ width: `${paidPctNumber}%` }}></div>
+        <div
+          className="bg-green-500 h-2 rounded"
+          style={{ width: `${paidPctNumber}%` }}
+        ></div>
       </div>
       {loading && <div>Loading...</div>}
       <Table striped>
@@ -254,19 +279,23 @@ export default function ReportsPage() {
             <TableHeader># Accounts</TableHeader>
             <TableHeader>Personal Total</TableHeader>
             <TableHeader>Manager Total</TableHeader>
-            {/* Removed Grand Total column */}
             <TableHeader>Upfront</TableHeader>
           </TableRow>
         </TableHead>
         <TableBody>
           {reportLines.map((line) => {
             const isAgentExpanded = expandedAgents.has(line.id);
-            const personalTotalDisplay = typeof line.personal_total === 'number' ? `$${line.personal_total.toFixed(2)}` : 'N/A';
-            const managerTotalDisplay = (typeof line.manager_total === 'number' && line.manager_total > 0) ? `$${line.manager_total.toFixed(2)}` : 'N/A';
-            // grandTotal is no longer displayed
-            const upfrontDisplay = (line.upfront_value !== null && !isNaN(line.upfront_value))
-              ? `$${line.upfront_value.toFixed(2)} (${line.upfront_percentage}%)`
+            const personalTotalDisplay = typeof line.personal_total === 'number'
+              ? `$${line.personal_total.toFixed(2)}`
               : 'N/A';
+            const managerTotalDisplay =
+              typeof line.manager_total === 'number' && line.manager_total > 0
+                ? `$${line.manager_total.toFixed(2)}`
+                : 'N/A';
+            const upfrontDisplay =
+              line.upfront_value !== null && !isNaN(line.upfront_value)
+                ? `$${line.upfront_value.toFixed(2)} (${line.upfront_percentage}%)`
+                : 'N/A';
             const lineAccs = Array.isArray(line.details) ? line.details : [];
 
             return (
@@ -308,7 +337,10 @@ export default function ReportsPage() {
                               const w = wgeMap[acc.white_glove_entry_id];
                               if (!w) return null;
                               const personalCommDisplay = `$${(acc.personal_commission || 0).toFixed(2)}`;
-                              const installDateDisplay = w.install_date ? new Date(w.install_date).toLocaleDateString() : 'N/A';
+                              const installDateDisplay = w.install_date
+                                ? new Date(w.install_date).toLocaleDateString()
+                                : 'N/A';
+
                               return (
                                 <TableRow key={idx} className={w.frontend_paid ? 'bg-green-50' : ''}>
                                   <TableCell>

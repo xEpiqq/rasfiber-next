@@ -42,26 +42,39 @@ async function computeBatchOverdueCountsBackend(supabase, batches) {
   const newOverdueCounts = {};
   for (const batch of batches) {
     const { data: linesData } = await supabase.from('payroll_reports').select('details').eq('batch_id', batch.id);
-    if (!linesData || linesData.length === 0) { newOverdueCounts[batch.id] = 0; continue; }
+    if (!linesData || linesData.length === 0) {
+      newOverdueCounts[batch.id] = 0;
+      continue;
+    }
 
     const allIds = [];
     for (const line of linesData) {
       if (Array.isArray(line.details)) {
-        for (const d of line.details) { if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id); }
+        for (const d of line.details) {
+          if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id);
+        }
       }
     }
 
-    if (allIds.length === 0) { newOverdueCounts[batch.id] = 0; continue; }
+    if (allIds.length === 0) {
+      newOverdueCounts[batch.id] = 0;
+      continue;
+    }
 
     const { data: wgeData } = await supabase
       .from('white_glove_entries')
       .select('install_date,backend_paid')
       .in('id', allIds);
 
-    if (!wgeData) { newOverdueCounts[batch.id] = 0; continue; }
+    if (!wgeData) {
+      newOverdueCounts[batch.id] = 0;
+      continue;
+    }
 
     let overdueCount = 0;
-    for (const w of wgeData) { if (!w.backend_paid && isOverdue(w.install_date)) overdueCount++; }
+    for (const w of wgeData) {
+      if (!w.backend_paid && isOverdue(w.install_date)) overdueCount++;
+    }
     newOverdueCounts[batch.id] = overdueCount;
   }
   return newOverdueCounts;
@@ -78,7 +91,9 @@ export default function BackendReportsPage() {
   const [wgeMap, setWgeMap] = useState({});
   const [batchPaidMap, setBatchPaidMap] = useState({});
 
-  useEffect(() => { fetchBatches(); }, []);
+  useEffect(() => {
+    fetchBatches();
+  }, []);
 
   async function fetchBatches() {
     setLoading(true);
@@ -119,21 +134,27 @@ export default function BackendReportsPage() {
       const allIds = [];
       for (const line of linesData) {
         if (Array.isArray(line.details)) {
-          for (const d of line.details) { if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id); }
+          for (const d of line.details) {
+            if (d.white_glove_entry_id) allIds.push(d.white_glove_entry_id);
+          }
         }
       }
 
       let wgeById = {};
       if (allIds.length > 0) {
         const { data: wgeData } = await supabase.from('white_glove_entries').select('*').in('id', allIds);
-        (wgeData || []).forEach(w => { wgeById[w.id] = w; });
+        (wgeData || []).forEach(w => {
+          wgeById[w.id] = w;
+        });
       }
 
+      // Auto-check if all accounts are paid => then mark the line as paid
       for (let i = 0; i < linesData.length; i++) {
         const line = linesData[i];
         const lineAccs = Array.isArray(line.details) ? line.details : [];
         const allPaid = lineAccs.length > 0 && lineAccs.every(d => {
-          const w = wgeById[d.white_glove_entry_id]; return w && w.backend_paid;
+          const w = wgeById[d.white_glove_entry_id];
+          return w && w.backend_paid;
         });
         if (allPaid && !line.backend_is_paid) {
           line.backend_is_paid = true;
@@ -182,17 +203,20 @@ export default function BackendReportsPage() {
     if (wgeIds.length > 0) {
       await supabase.from('white_glove_entries').update({ backend_paid: newPaidValue }).in('id', wgeIds);
       const newWgeMap = { ...wgeMap };
-      wgeIds.forEach(id => { if (newWgeMap[id]) newWgeMap[id].backend_paid = newPaidValue; });
+      wgeIds.forEach(id => {
+        if (newWgeMap[id]) newWgeMap[id].backend_paid = newPaidValue;
+      });
       setWgeMap(newWgeMap);
     }
 
-    setReportLines(prev => prev.map(r => r.id === line.id ? updatedLine : r));
+    setReportLines(prev => prev.map(r => (r.id === line.id ? updatedLine : r)));
     if (newPaidValue) setExpandedAgents(prev => new Set([...prev, updatedLine.id]));
   }
 
   async function toggleAccountPaid(line, wgeId) {
-    const wge = wgeMap[wgeId]; if (!wge) return;
-    const newPaidValue = !wge.backend_paid;
+    const w = wgeMap[wgeId];
+    if (!w) return;
+    const newPaidValue = !w.backend_paid;
     await supabase.from('white_glove_entries').update({ backend_paid: newPaidValue }).eq('id', wgeId);
     const newWgeMap = { ...wgeMap };
     newWgeMap[wgeId].backend_paid = newPaidValue;
@@ -202,10 +226,10 @@ export default function BackendReportsPage() {
     const allPaid = lineAccs.every(d => newWgeMap[d.white_glove_entry_id]?.backend_paid);
     if (allPaid && !line.backend_is_paid) {
       await supabase.from('payroll_reports').update({ backend_is_paid: true }).eq('id', line.id);
-      setReportLines(prev => prev.map(r => r.id === line.id ? { ...r, backend_is_paid: true } : r));
+      setReportLines(prev => prev.map(r => (r.id === line.id ? { ...r, backend_is_paid: true } : r)));
     } else if (!allPaid && line.backend_is_paid) {
       await supabase.from('payroll_reports').update({ backend_is_paid: false }).eq('id', line.id);
-      setReportLines(prev => prev.map(r => r.id === line.id ? { ...r, backend_is_paid: false } : r));
+      setReportLines(prev => prev.map(r => (r.id === line.id ? { ...r, backend_is_paid: false } : r)));
     }
   }
 
@@ -288,7 +312,10 @@ export default function BackendReportsPage() {
                     {overdueCount}
                   </span>
                 )}
-                <div className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Dropdown>
                     <DropdownButton as="div" className="cursor-pointer flex justify-center items-center">
                       <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
@@ -344,19 +371,28 @@ export default function BackendReportsPage() {
         <TableBody>
           {reportLines.map((line) => {
             const isAgentExpanded = expandedAgents.has(line.id);
-            const personalTotalDisplay = typeof line.personal_total === 'number' ? `$${line.personal_total.toFixed(2)}` : 'N/A';
+            const personalTotalDisplay = typeof line.personal_total === 'number'
+              ? `$${line.personal_total.toFixed(2)}`
+              : 'N/A';
             const backendVal = line.backend_value || 0;
             const backendPerc = line.backend_percentage;
-            const backendDisplay = (backendPerc !== null && !isNaN(backendPerc))
-              ? `$${backendVal.toFixed(2)} (${backendPerc}%)`
-              : 'N/A';
+            const backendDisplay =
+              backendPerc !== null && !isNaN(backendPerc)
+                ? `$${backendVal.toFixed(2)} (${backendPerc}%)`
+                : 'N/A';
             const overdueLine = lineHasOverdue(line);
             let maxDays = overdueLine ? getMaxOverdueDaysForLine(line) : 0;
-            if (overdueLine) maxDays = maxDays - 90;
+            if (overdueLine) maxDays = maxDays - 90; // how many days over 90
             const lineStatus = overdueLine && !line.backend_is_paid
               ? `Overdue (${maxDays} days)`
-              : (line.backend_is_paid ? 'Paid' : 'Unpaid');
-            const lineRowClass = line.backend_is_paid ? 'bg-green-100' : (overdueLine ? 'bg-red-100' : '');
+              : line.backend_is_paid
+              ? 'Paid'
+              : 'Unpaid';
+            const lineRowClass = line.backend_is_paid
+              ? 'bg-green-100'
+              : overdueLine
+              ? 'bg-red-100'
+              : '';
             const textClass = overdueLine ? 'text-red-700 font-bold' : '';
             const lineAccs = Array.isArray(line.details) ? line.details : [];
 
@@ -368,7 +404,9 @@ export default function BackendReportsPage() {
                       {isAgentExpanded ? <ChevronUpIcon className="h-5 w-5" /> : <ChevronDownIcon className="h-5 w-5" />}
                     </Button>
                   </TableCell>
-                  <TableCell><Checkbox checked={line.backend_is_paid} onChange={() => togglePaid(line)} /></TableCell>
+                  <TableCell>
+                    <Checkbox checked={line.backend_is_paid} onChange={() => togglePaid(line)} />
+                  </TableCell>
                   <TableCell className={textClass}>{line.name}</TableCell>
                   <TableCell>{line.accounts}</TableCell>
                   <TableCell>{personalTotalDisplay}</TableCell>
@@ -398,19 +436,30 @@ export default function BackendReportsPage() {
                               const w = wgeMap[acc.white_glove_entry_id];
                               if (!w) return null;
                               const personalCommDisplay = `$${(acc.personal_commission || 0).toFixed(2)}`;
-                              const installDateDisplay = w.install_date ? new Date(w.install_date).toLocaleDateString() : 'N/A';
+                              const installDateDisplay = w.install_date
+                                ? new Date(w.install_date).toLocaleDateString()
+                                : 'N/A';
                               const overdueAcc = accountIsOverdue(w.id);
                               let overdueDays = overdueAcc ? getOverdueDaysForAccount(w.id) : 0;
                               if (overdueAcc) overdueDays = overdueDays - 90;
                               const accStatus = overdueAcc && !w.backend_paid
                                 ? `Overdue (${overdueDays} days)`
-                                : (w.backend_paid ? 'Paid' : 'Unpaid');
-                              const accRowClass = w.backend_paid ? 'bg-green-50' : (overdueAcc ? 'bg-red-50' : '');
+                                : w.backend_paid
+                                ? 'Paid'
+                                : 'Unpaid';
+                              const accRowClass = w.backend_paid
+                                ? 'bg-green-50'
+                                : overdueAcc
+                                ? 'bg-red-50'
+                                : '';
 
                               return (
                                 <TableRow key={idx} className={accRowClass}>
                                   <TableCell>
-                                    <Checkbox checked={!!w.backend_paid} onChange={() => toggleAccountPaid(line, w.id)} />
+                                    <Checkbox
+                                      checked={!!w.backend_paid}
+                                      onChange={() => toggleAccountPaid(line, w.id)}
+                                    />
                                   </TableCell>
                                   <TableCell>{w.order_number}</TableCell>
                                   <TableCell>{w.customer_name}</TableCell>

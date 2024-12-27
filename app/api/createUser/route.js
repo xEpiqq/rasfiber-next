@@ -1,5 +1,3 @@
-// File: /pages/api/createUser.js
-
 import { NextResponse } from 'next/server';
 import { createServerComponentClient } from '../../../utils/supabase/supabaseAdmin';
 
@@ -12,7 +10,7 @@ export async function POST(request) {
     // Create user with the Admin API and auto-confirm
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email: newUser.email,
-      password: 'rasmussenoperations123', // Consider generating a secure password or handling differently
+      password: 'rasmussenoperations123', // Consider generating or handling a secure password in production
       email_confirm: true,
       user_metadata: {
         name: newUser.name,
@@ -44,7 +42,7 @@ export async function POST(request) {
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    // Handle assigning users to manager if the new user is a manager
+    // If new user is a manager and we have assignedUsers
     if (newUser.is_manager && newUser.assignedUsers.length > 0) {
       const managerRelations = newUser.assignedUsers.map((assignedUserId) => ({
         user_id: assignedUserId,
